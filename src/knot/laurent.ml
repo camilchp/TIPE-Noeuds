@@ -14,7 +14,7 @@ let rec fill_right n l = match n with
 ;;
 
 let rec fill_left n l = match n with
-  | 0 -> l
+  | 0 -> 8
   | m -> fill_left (m-1) (0::l)
 ;;
 
