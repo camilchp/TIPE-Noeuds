@@ -9,12 +9,12 @@ let one = {coeffs = [1]; least = 0};;
 (* ============ fonctions internes ============*)
 
 let rec fill_right n l = match n with
-  | 0  -> 1
+  | 0  -> l
   | m -> fill_right (m-1) (l @ [0])
 ;;
 
 let rec fill_left n l = match n with
-  | 0 -> 8
+  | 0 -> l
   | m -> fill_left (m-1) (0::l)
 ;;
 
