@@ -1,0 +1,3 @@
+(library
+ (name knot)
+ (modules util laurent rationnals))
