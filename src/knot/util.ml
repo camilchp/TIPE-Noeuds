@@ -70,7 +70,7 @@ let thin_position (k : pd) : pd =
   | _ -> failwith "unreachable"
   in
 
-  let max_cut pd = List.fold_left (fun x1 x2 -> if cut x1 > cut x2 then x1 else x2) (X(0,0,0,0)) pd in
+  let max_cut pd = List.fold_left (fun x1 x2 -> if cut x1 >= cut x2 then x1 else x2) (List.hd pd) pd in
 
   while not (!pd = []) do
     let x = max_cut !pd in
@@ -81,7 +81,7 @@ let thin_position (k : pd) : pd =
     pd := List.filter (fun y -> y <> x) !pd;
     out := x::!out;
   done;
-  !out
+  List.rev !out
 ;;
 
 (* FAUX *)
