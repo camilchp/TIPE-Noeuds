@@ -4,8 +4,11 @@ open Laurent;;
 
 (** Each number corresponds to a strand : X represents a crossing, P a point joining two strands together.*)
 type node =
-  | X of int * int * int * int
-  | P of int * int
+  | X of int * int * int * int                  (* c   b  *)
+  | P of int * int                              (*  \ /   *)
+                                                (*   /    *)
+                                                (*  / \   *)
+                                                (* d   a  *)
 ;;
 
 type pd = node list;;
@@ -39,7 +42,7 @@ let string_of_node = function
 
 let string_of_pd k = "[" ^ (k |> List.map string_of_node |> String.concat " ") ^ "]";;
 
-let string_of_pol (f : pd -> 'a Laurent.t) (k : pd) : string = k |> f |> string_of_laurent_pretty;;
+let string_of_pol (f : pd -> Laurent.t) (k : pd) : string = k |> f |> string_of_laurent_pretty;;
 
 (* Functions *****************************************************************)
 
@@ -50,14 +53,49 @@ let rec crossing_number (k : pd) : int =
   | P(_,_)::pd -> crossing_number pd
 ;;
 
-let rec bracket (k : pd) : int Laurent.t =
+let rec bracket (k : pd) : Laurent.t =
   match k with
   | [P(a,b)] when a = b -> one                                                                                          (* < o > = 1                       *)
   | P(a, b)::pd when a = b -> let p = bracket pd in sum (shift 2 p) (shift (-2) p ) |> factor (-1)                      (* < o L > = (-A^2 - A^-2) <L>     *)
   | P(a,b)::pd -> pd |> pd_map (fun c -> if c = a then b else c) |> bracket                                             (* réduction des jointures         *)
-  | X(a,b,c,d)::pd -> sum (P(a,d)::P(b,c)::pd |> bracket |> shift (-1)) (P(a,b)::P(c,d)::pd |> bracket |> shift 1)      (* < X > = A^-1 < || > + A^1 < = > *)
+  | X(a,b,c,d)::pd -> sum (P(a,d)::P(b,c)::pd |> bracket |> shift (-1)) (P(a,b)::P(c,d)::pd |> bracket |> shift 1)      (* < X > = A^-1 < = > + A^1 < || > *)
   | _ -> let s = string_of_pd k in Printf.printf "bracket : %s \n" s; failwith "bracket : match failure"
 ;;
+
+(** Describes direction in oriented knot-pd. Fails in rare case when n+1 --> n (picture a single loop intersecting a line segment) *)
+let (-->) a b = (b = (a+1)) || (a <> (b+1) && b < a);; (* TODO: identify and simplify these cases ? seems difficult... *)
+
+let sign node : int =
+  match node with
+  | X(a,b,c,d) -> if (c --> a && b --> d) || (a --> c && d --> b) then ((*print_endline (Printf.sprintf " +1 -- a : %i, b : %i, c : %i, d : %i" a b c d);*) 1) else ((*print_endline (Printf.sprintf " -1 -- a : %i, b : %i, c : %i, d : %i" a b c d);*) -1)
+  | P(_,_) -> 0
+;;
+
+let rec writhe (k : pd) : int =
+  match k with
+  | [] -> 0
+  | node::pd -> sign node + writhe pd
+;;
+
+let kauffman_x (k : pd) : Laurent.t =
+  let w = writhe k in
+  k |> bracket |> shift (-3*w) |> (fun p -> if w mod 2 = 0 then p else factor (-1) p )
+;;
+
+(* Works only if powers are divisible by four !*)
+(* TODO: make it work when only divisible by two : all kauffman_x are ! *)
+let jones (k : pd) : Laurent.t =
+  let p = kauffman_x k in
+  let i = ref(p.least-1) in
+  List.fold_left (fun q coeff -> 
+    incr i;
+    if coeff <> 0 
+      then (sum q {coeffs = [coeff]; least = -(!i/4)})
+      else q
+  ) zero p.coeffs
+;;
+
+(* Fast Kauffman Bracket ******************************************************)
 
 (** Thin position returns a pd of the given knot, in an order that maximises connexity. Starts with the first crossing and finds next best crossing in a greedy fashion*)
 let thin_position (k : pd) : pd =
@@ -82,38 +120,4 @@ let thin_position (k : pd) : pd =
     out := x::!out;
   done;
   List.rev !out
-;;
-
-(* FAUX *)
-(* Should work as long as there is no single loop around wire TODO: use Ps to fix (replace all X(aabc) with P?) *)
-let (-->) a b = (b = (a+1)) || (a <> (b+1) && b < a);;
-
-let sign node : int =
-  match node with
-  | X(a,b,c,d) -> if (c --> a && b --> d) || (a --> c && d --> b) then ((*print_endline (Printf.sprintf " +1 -- a : %i, b : %i, c : %i, d : %i" a b c d);*) 1) else ((*print_endline (Printf.sprintf " -1 -- a : %i, b : %i, c : %i, d : %i" a b c d);*) -1)
-  | P(_,_) -> 0
-;;
-
-let rec writhe (k : pd) : int =
-  match k with
-  | [] -> 0
-  | node::pd -> sign node + writhe pd
-;;
-
-let kauffman_x (k : pd) : int Laurent.t =
-  let w = writhe k in
-  k |> bracket |> shift (-3*w) |> (fun p -> if w mod 2 = 0 then p else factor (-1) p )
-;;
-
-(* Works only if powers are divisible by four !*)
-(* TODO: make it work when only divisible by two : all kauffman_x are ! *)
-let jones (k : pd) : int Laurent.t =
-  let p = kauffman_x k in
-  let i = ref(p.least-1) in
-  List.fold_left (fun q coeff -> 
-    incr i;
-    if coeff <> 0 
-      then (sum q {coeffs = [coeff]; least = -(!i/4)})
-      else q
-  ) zero p.coeffs
 ;;
